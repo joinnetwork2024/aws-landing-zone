@@ -32,3 +32,4 @@ Each resource is controlled via input variables. Use this module multiple times 
 - Delegated admin registration
 
 ---
+
