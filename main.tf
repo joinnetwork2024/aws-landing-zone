@@ -1,5 +1,12 @@
-# Ensure the AWS provider is configured for the Management Account
-
+locals {
+  # Define a map for your common tags
+  common_tags = {
+    Name        = "terraform"
+    ManagedBy   = "Terraform"
+    Environment = "LandingZone" # Example of another common tag
+    Project     = var.project_prefix
+  }
+}
 # ----------------------------------------------------
 # 1. Enable AWS Organizations (if not already enabled)
 # ----------------------------------------------------
@@ -17,6 +24,7 @@ resource "aws_organizations_organization" "main" {
     "macie.amazonaws.com",
     "fms.amazonaws.com", # Firewall Manager
   ]
+  enabled_policy_types = ["SERVICE_CONTROL_POLICY", ]
 
 }
 
@@ -72,16 +80,16 @@ resource "aws_organizations_organizational_unit" "sandbox_ou" {
 # ----------------------------------------------------
 
 resource "aws_organizations_account" "audit_account" {
-  name  = "sdtrading" # Friendly name for the account
-  email = var.root_email # !!! REPLACE WITH UNIQUE EMAIL !!!
+  name      = "sdtrading"    # Friendly name for the account
+  email     = var.root_email # !!! REPLACE WITH UNIQUE EMAIL !!!
   parent_id = aws_organizations_organizational_unit.security_ou.id
-#   iam_user_access_to_billing = "ALLOW" # Important for cost management roles
+  #   iam_user_access_to_billing = "ALLOW" # Important for cost management roles
 
   tags = {
     Name = "${var.project_prefix}-AuditAccount"
   }
 
-    lifecycle {
+  lifecycle {
     # Ignore changes to 'iam_user_access_to_billing'
     # This prevents replacement if this attribute is the only one changing
     # or if the existing account's setting cannot be changed in-place.
@@ -94,13 +102,13 @@ resource "aws_organizations_account" "audit_account" {
       # name, # Be careful with ignoring 'name' if you want Terraform to manage renaming
       # parent_id, # Only ignore if you move OUs manually often
     ]
-    }
+  }
 }
 
 resource "aws_organizations_account" "log_archive_account" {
-  name  = "lz-log-archive"
-  email = var.security_account_email # !!! REPLACE WITH UNIQUE EMAIL !!!
-  parent_id = aws_organizations_organizational_unit.security_ou.id
+  name                       = "lz-log-archive"
+  email                      = var.security_account_email # !!! REPLACE WITH UNIQUE EMAIL !!!
+  parent_id                  = aws_organizations_organizational_unit.security_ou.id
   iam_user_access_to_billing = "ALLOW"
 
   tags = {
@@ -109,9 +117,9 @@ resource "aws_organizations_account" "log_archive_account" {
 }
 
 resource "aws_organizations_account" "network_account" {
-  name  = "lz-network"
-  email = var.network_account_email # !!! REPLACE WITH UNIQUE EMAIL !!!
-  parent_id = aws_organizations_organizational_unit.network_ou.id
+  name                       = "lz-network"
+  email                      = var.network_account_email # !!! REPLACE WITH UNIQUE EMAIL !!!
+  parent_id                  = aws_organizations_organizational_unit.network_ou.id
   iam_user_access_to_billing = "ALLOW"
 
   tags = {
@@ -120,9 +128,9 @@ resource "aws_organizations_account" "network_account" {
 }
 
 resource "aws_organizations_account" "dev_workload_account" {
-  name  = "lz-dev-workload-01"
-  email = var.dev_account_email # !!! REPLACE WITH UNIQUE EMAIL !!!
-  parent_id = aws_organizations_organizational_unit.dev_ou.id
+  name                       = "lz-dev-workload-01"
+  email                      = var.dev_account_email # !!! REPLACE WITH UNIQUE EMAIL !!!
+  parent_id                  = aws_organizations_organizational_unit.dev_ou.id
   iam_user_access_to_billing = "ALLOW"
 
   tags = {
