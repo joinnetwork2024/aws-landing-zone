@@ -1,0 +1,49 @@
+name: "AWS Landing Zone Governance"
+
+on:
+  push:
+    branches: [ main ]
+
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  opa-governance-check:
+    name: "Validate Infrastructure Policies"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup OPA
+        uses: open-policy-agent/setup-opa@v2
+        with:
+          version: latest
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Generate Terraform Plan
+        run: terraform plan -out=tfplan
+
+      # OPA requires JSON, so we convert the binary plan file
+      - name: Convert Plan to JSON
+        run: terraform show -json tfplan > tfplan.json
+
+      # Run the evaluation
+      - name: OPA Policy Evaluation
+        id: opa_check
+        run: |
+          # The --fail-defined flag ensures the job fails if a 'deny' rule is met
+          # We evaluate the "deny" path in our Rego package
+          RESULT=$(opa eval -i tfplan.json -d policies/ "data.terraform.security.deny" --format json)
+          
+          # Check if the result array is not empty
+          if [[ $(echo $RESULT | jq '.result[0].expressions[0].value | length') -gt 0 ]]; then
+            echo "Policy Violations Detected:"
+            echo $RESULT | jq '.result[0].expressions[0].value'
+            exit 1
+          fi
