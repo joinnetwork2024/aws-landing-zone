@@ -32,6 +32,8 @@ Each resource is controlled via input variables. Use this module multiple times 
 - Delegated admin registration
 
 ---
-
+In Terraform:
+file() simply reads a file as a string (it does not support variables).
+templatefile() reads the file and injects your variables into it.
 
 

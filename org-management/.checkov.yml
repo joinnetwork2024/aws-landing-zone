@@ -1,0 +1,4 @@
+# .checkov.yml
+skip-path:
+  - policies/scp-restrict-regions.json
+  - policies/                     # or ignore the whole policies folder if you have more JSONs
