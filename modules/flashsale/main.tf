@@ -14,7 +14,6 @@ resource "aws_elasticache_cluster" "redis" {
 # 2. Aurora Serverless v2 for the persistent Order data
 resource "aws_rds_cluster" "aurora" {
   cluster_identifier      = "${var.env}-flashsale-db"
-  # FIX: Change "aws-rds-postgresql" to "aurora-postgresql"
   engine                  = "aurora-postgresql" 
   engine_mode             = "provisioned"
   engine_version          = "15.6"
@@ -23,6 +22,7 @@ resource "aws_rds_cluster" "aurora" {
   master_password         = var.db_password
   vpc_security_group_ids  = [aws_security_group.db_sg.id]
   db_subnet_group_name    = aws_db_subnet_group.aurora.name
+  skip_final_snapshot = true
 
   serverlessv2_scaling_configuration {
     max_capacity = 16.0

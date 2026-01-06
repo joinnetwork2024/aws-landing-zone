@@ -3,7 +3,10 @@ name: "AWS Landing Zone Governance"
 on:
   push:
     branches: [ main ]
-
+      - 'environments/dev/**'
+      - 'environments/prod/**'
+      - 'org-management/**'
+      - 'policies/**'
   pull_request:
     branches: [ main ]
 
