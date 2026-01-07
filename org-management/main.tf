@@ -1,9 +1,19 @@
 locals {
+  # Mandatory Enterprise Tags
   common_tags = {
-    ManagedBy   = "Terraform"
-    Environment = "LandingZone"
-    Project     = var.project_prefix
+    CostCenter  = "Infrastructure-101"
+    Environment = "Production"
+    Owner       = "Platform-Team"
+    Project     = "JoinNetwork-LZ"
   }
+
+  # Helper for Account tags (merges base tags with the specific account name)
+  account_tags_dev      = merge(local.common_tags, { Name = "joinnetwork-dev", Environment = "Development" })
+  account_tags_prod     = merge(local.common_tags, { Name = "joinnetwork-prod", Environment = "Production" })
+  account_tags_staging  = merge(local.common_tags, { Name = "joinnetwork-staging", Environment = "Staging" })
+  account_tags_log      = merge(local.common_tags, { Name = "joinnetwork-log", Environment = "Log", Owner = "security-team" })
+  account_tags_network  = merge(local.common_tags, { Name = "joinnetwork-network", Environment = "network", Owner = "network-team" })
+  account_tags_security = merge(local.common_tags, { Name = "joinnetwork-security", Environment = "security", Owner = "security-team" })
 }
 
 # ----------------------------------------------------
@@ -21,6 +31,7 @@ resource "aws_organizations_organization" "main" {
     "fms.amazonaws.com",
   ]
   enabled_policy_types = ["SERVICE_CONTROL_POLICY"]
+  
 }
 
 # ----------------------------------------------------
@@ -51,12 +62,14 @@ resource "aws_organizations_account" "log_archive" {
   name      = "lz-log-archive"
   email     = var.log_archive_email
   parent_id = aws_organizations_organizational_unit.security_ou.id
+  tags      = local.account_tags_log
 }
 
 resource "aws_organizations_account" "network" {
   name      = "lz-network"
   email     = var.network_account_email
   parent_id = aws_organizations_organizational_unit.network_ou.id
+  tags      = local.account_tags_network
 }
 
 # Workload Accounts
@@ -64,18 +77,21 @@ resource "aws_organizations_account" "dev" {
   name      = "lz-dev-workload"
   email     = var.dev_account_email
   parent_id = aws_organizations_organizational_unit.workloads_ou.id
+  tags      = local.account_tags_dev
 }
 
 resource "aws_organizations_account" "staging" {
   name      = "lz-staging-workload"
   email     = var.staging_account_email # Add this to your variables.tf
   parent_id = aws_organizations_organizational_unit.workloads_ou.id
+  tags      = local.account_tags_staging
 }
 
 resource "aws_organizations_account" "prod" {
   name      = "lz-prod-workload"
   email     = var.prod_account_email # Add this to your variables.tf
   parent_id = aws_organizations_organizational_unit.workloads_ou.id
+  tags      = local.account_tags_prod
 }
 
 # ----------------------------------------------------

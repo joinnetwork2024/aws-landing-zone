@@ -9,6 +9,7 @@ resource "aws_kms_key" "cloudtrail_kms_key" {
     log_archive_account_id = aws_organizations_account.log_archive.id,
     trail_name             = "${var.project_prefix}-Organization-Trail"
   })
+  tags = local.common_tags
 }
 
 # 2. S3 Bucket for Logs (Dedicated to CloudTrail)
@@ -17,6 +18,18 @@ resource "aws_s3_bucket" "cloudtrail_logs" {
 
   # Modern Object Ownership
   force_destroy = false
+  tags = local.common_tags
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "cloudtrail_logs" {
+  bucket = aws_s3_bucket.cloudtrail_logs.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.s3.arn
+    }
+  }
 }
 
 # 3. Bucket Policy (Allows all accounts in Org to write logs)
@@ -41,6 +54,7 @@ resource "aws_cloudtrail" "organization_trail" {
   # CloudWatch Integration
   cloud_watch_logs_group_arn = "${aws_cloudwatch_log_group.cloudtrail_log_group.arn}:*"
   cloud_watch_logs_role_arn  = aws_iam_role.cloudtrail_cloudwatch_role.arn
+  tags = local.common_tags
 
   depends_on = [aws_s3_bucket_policy.cloudtrail_bucket_policy]
 }
@@ -88,4 +102,5 @@ resource "aws_iam_role_policy" "cloudtrail_cloudwatch_policy" {
       }
     ]
   })
+ 
 }

@@ -24,18 +24,25 @@ provider "aws" {
 }
 
 resource "aws_s3_bucket" "tf_state" {
-  bucket = "terraform-landingzone-state-joinnetwork2021"
+  bucket = "terraform-landingzone-state-2017"
   # (Other config here, but minimal is fine for import)
+
+  # Modern Object Ownership
+  force_destroy = false
+  tags = local.common_tags
 }
 
-# resource "aws_s3_bucket" "tf_state" {
-#   bucket = "terraform-landingzone-state-joinnetwork2021"
 
-#   tags = {
-#     Name        = "Terraform State Bucket"
-#     Environment = "Dev"
-#   }
-# }
+resource "aws_s3_bucket_server_side_encryption_configuration" "tf_state" {
+  bucket = aws_s3_bucket.tf_state.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.s3.arn
+    }
+  }
+}
 
 resource "aws_s3_bucket_versioning" "tf_state_versioning" {
   bucket = aws_s3_bucket.tf_state.id
@@ -43,5 +50,6 @@ resource "aws_s3_bucket_versioning" "tf_state_versioning" {
   versioning_configuration {
     status = "Enabled"
   }
+  
 }
 

@@ -52,3 +52,19 @@ output "cloudtrail_cloudwatch_role_arn" {
   description = "The ARN of the IAM role used by CloudTrail to publish to CloudWatch Logs."
   value       = aws_iam_role.cloudtrail_cloudwatch_role.arn
 }
+
+# AWS Account ID
+output "staging_id" {
+  description = "The AWS Account ID for the Staging workload"
+  value       = aws_organizations_account.staging.id
+}
+
+output "dev_id" {
+  description = "The AWS Account ID for the Staging workload"
+  value       = aws_organizations_account.dev.id
+}
+
+output "prod" {
+  description = "The AWS Account ID for the Staging workload"
+  value       = aws_organizations_account.prod.id
+}
