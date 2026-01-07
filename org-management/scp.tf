@@ -14,22 +14,34 @@ resource "aws_organizations_policy" "restrict_regions_scp" {
   })
 }
 
-# Attach to the Workloads OU (Covers Dev, Staging, and Prod at once)
+
 resource "aws_organizations_policy_attachment" "workloads_region_restriction" {
   policy_id = aws_organizations_policy.restrict_regions_scp.id
   target_id = aws_organizations_organizational_unit.workloads_ou.id
 }
 
-# SCP 2: Baseline Deny (Protecting sensitive OUs)
-resource "aws_organizations_policy" "baseline_deny_all" {
-  name        = "Baseline-Deny-All"
-  description = "Denies all actions unless explicitly allowed"
-  content     = file("${path.module}/policies/baseline-deny-all.json")
+
+resource "aws_organizations_policy" "baseline_security_guardrails" {
+  name        = "baseline-security-guardrails"
+  description = "Prevents disabling core security services"
+  content     = file("${path.module}/policies/baseline-security-guardrails.json")
   type        = "SERVICE_CONTROL_POLICY"
 }
 
-# Example: Attaching a strict policy to a specific account or OU if needed
-# resource "aws_organizations_policy_attachment" "deny_all_security" {
-#   policy_id = aws_organizations_policy.baseline_deny_all.id
-#   target_id = aws_organizations_organizational_unit.security_ou.id
-# }
+resource "aws_organizations_policy_attachment" "baseline_workloads" {
+  policy_id = aws_organizations_policy.baseline_security_guardrails.id
+  target_id = aws_organizations_organizational_unit.workloads_ou.id
+}
+
+
+resource "aws_organizations_policy" "root_security_guardrails" {
+  name        = "Root-Security-Guardrails"
+  description = "Protects organization integrity and auditability"
+  type        = "SERVICE_CONTROL_POLICY"
+  content     = file("${path.module}/policies/root-security-guardrails.json")
+}
+
+resource "aws_organizations_policy_attachment" "root_security_guardrails" {
+  policy_id = aws_organizations_policy.root_security_guardrails.id
+  target_id = aws_organizations_organization.main.roots[0].id
+}
