@@ -2,13 +2,16 @@ name: "AWS Landing Zone Governance"
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+    paths:
       - 'environments/dev/**'
       - 'environments/prod/**'
       - 'org-management/**'
       - 'policies/**'
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
   opa-governance-check:
@@ -42,7 +45,7 @@ jobs:
         run: |
           # The --fail-defined flag ensures the job fails if a 'deny' rule is met
           # We evaluate the "deny" path in our Rego package
-          RESULT=$(opa eval -i tfplan.json -d policies/ "data.terraform.security.deny" --format json)
+          RESULT=$(opa eval -i tfplan.json -d policies/ "data.terraform.security.deny" --format json --fail-defined)
           
           # Check if the result array is not empty
           if [[ $(echo $RESULT | jq '.result[0].expressions[0].value | length') -gt 0 ]]; then
