@@ -111,6 +111,45 @@ Higher-level infrastructure (networking, security tooling, workloads) should be 
 
 ---
 
+📍 Architecture Diagram
+
+OU hierarchy
+
+Accounts per environment
+
+Delegated admins & trust relationships
+
+📍 Terraform Module Layout
+
+Which modules create which resources
+
+How environments are structured
+
+📍 Deployment Steps
+
+Setup pre-reqs (AWS creds, Terraform init, backends)
+
+How to run each environment
+
+📍 Trade-offs & Assumptions
+Examples:
+
+Using Terraform vs AWS Control Tower best practices
+
+Delegated admin risks vs central control
+
+SCP scope and implications
+
+📍 Link to deployed resources
+
+AWS Org info
+
+SCP attachments
+
+OU/account IDs
+
+CloudTrail and security services once deployed
+
 ## 📜 License
 
 MIT License

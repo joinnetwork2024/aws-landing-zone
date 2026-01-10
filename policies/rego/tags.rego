@@ -14,7 +14,9 @@ untaggable_resources := {
     "aws_s3_bucket_server_side_encryption_configuration",
     "aws_s3_bucket_versioning",
     "aws_organizations_organization",
-    "aws_organizations_policy_attachment"
+    "aws_organizations_policy_attachment",
+    "aws_route_table_association",
+    "aws_sns_topic_subscription"
 }
 
 deny contains msg if {
