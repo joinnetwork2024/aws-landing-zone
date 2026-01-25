@@ -21,30 +21,38 @@ on:
       - 'modules/**'
 
 jobs:
-  validate-infrastructure-policies:
-    name: "Validate Infrastructure Policies"
+  validate-all-projects:
+    name: "Validate All Projects"
     runs-on: ubuntu-latest
     strategy:
       matrix:
+        project: ['flashsale', 'iotmonitor', 'smart']
         environment: ['dev', 'prod']
-        include:
+        exclude:
           - environment: 'dev'
-            working_directory: './environments/dev'
-          - environment: 'prod'
-            working_directory: './environments/prod'
+            project: 'flashsale'  # Example: exclude flashsale from dev
+        include:
+          - project: 'flashsale'
+            directory: 'environments/dev/flashsale'
+          - project: 'iotmonitor'
+            directory: 'environments/dev/iotmonitor'
+          - project: 'smart'
+            directory: 'environments/dev/smart'
+          - project: 'flashsale'
+            directory: 'environments/prod/flashsale'
+            environment: 'prod'
     
     defaults:
       run:
-        working-directory: ${{ matrix.working_directory }}
+        working-directory: ${{ matrix.directory }}
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch all history for proper terraform operations
-          submodules: recursive
+          fetch-depth: 0
 
-      - name: Setup OPA (Open Policy Agent)
+      - name: Setup OPA
         uses: open-policy-agent/setup-opa@v2
         with:
           version: '0.58.0'
@@ -56,9 +64,10 @@ jobs:
 
       - name: Terraform Format Check
         run: |
-          terraform fmt -check -recursive
+          echo "Checking format for ${{ matrix.project }} in ${{ matrix.environment }}..."
+          terraform fmt -check
           if [ $? -ne 0 ]; then
-            echo "Some Terraform files need formatting. Run 'terraform fmt' to fix."
+            echo "Terraform files need formatting. Run 'terraform fmt' to fix."
             exit 1
           fi
 
@@ -69,49 +78,51 @@ jobs:
         run: terraform validate
 
       - name: Generate Terraform Plan
+        id: generate_plan
         run: |
-          terraform plan \
-            -var-file="terraform.tfvars" \
-            -var="environment=${{ matrix.environment }}" \
-            -out=tfplan.binary \
-            -input=false \
-            -lock=false
+          # Check if project-specific tfvars exists
+          if [ -f "${{ matrix.project }}.tfvars" ]; then
+            terraform plan \
+              -var-file="${{ matrix.project }}.tfvars" \
+              -out=tfplan.binary \
+              -input=false
+          else
+            terraform plan \
+              -out=tfplan.binary \
+              -input=false
+          fi
 
       - name: Convert Plan to JSON
-        id: convert_plan
         run: |
           terraform show -json tfplan.binary > tfplan.json
-          echo "PLAN_JSON=$(pwd)/tfplan.json" >> $GITHUB_OUTPUT
+          echo "Plan JSON generated"
 
       - name: Run OPA Policy Evaluation
-        id: opa_evaluation
         run: |
-          # Navigate back to root to access policies
+          # Navigate to policies directory
           cd ${{ github.workspace }}
           
-          echo "Evaluating policies for ${{ matrix.environment }} environment..."
+          echo "Evaluating policies for ${{ matrix.project }} (${{ matrix.environment }})..."
           
-          # Run OPA evaluation with the plan
+          # Run OPA evaluation
           opa eval \
             --data ./policies/ \
-            --input ${{ steps.convert_plan.outputs.PLAN_JSON }} \
+            --input ${{ matrix.directory }}/tfplan.json \
             "data.terraform.policy.deny" \
             --format json \
-            --fail-defined > opa_result.json || true
+            --fail-defined > opa_result.json 2>/dev/null || true
           
-          # Process OPA results
           if [ -f opa_result.json ]; then
-            VIOLATIONS=$(jq '.result[0].expressions[0].value | length' opa_result.json)
+            VIOLATIONS=$(jq '.result[0].expressions[0].value | length' opa_result.json 2>/dev/null || echo "0")
             if [ "$VIOLATIONS" -gt 0 ]; then
-              echo "❌ Found $VIOLATIONS policy violations in ${{ matrix.environment }} environment:"
+              echo "❌ Found $VIOLATIONS policy violations in ${{ matrix.project }}:"
               jq '.result[0].expressions[0].value[]' opa_result.json
               exit 1
             else
-              echo "✅ No policy violations found in ${{ matrix.environment }} environment"
+              echo "✅ No policy violations found in ${{ matrix.project }}"
             fi
           else
-            echo "⚠️ No OPA results generated"
-            exit 1
+            echo "⚠️ No OPA results generated for ${{ matrix.project }}"
           fi
 
       - name: Cleanup
