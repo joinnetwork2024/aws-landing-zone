@@ -28,9 +28,9 @@ jobs:
       matrix:
         project: ['flashsale', 'iotmonitor', 'smart']
         environment: ['dev', 'prod']
-        exclude:
-          - environment: 'dev'
-            project: 'flashsale'  # Example: exclude flashsale from dev
+        # exclude:
+        #   - environment: 'dev'
+        #     project: 'flashsale'  # Example: exclude flashsale from dev
         include:
           - project: 'flashsale'
             directory: 'environments/dev/flashsale'
@@ -38,8 +38,8 @@ jobs:
             directory: 'environments/dev/iotmonitor'
           - project: 'smart'
             directory: 'environments/dev/smart'
-          - project: 'flashsale'
-            directory: 'environments/prod/flashsale'
+          - project: 'network'
+            directory: 'environments/prod/network'
             environment: 'prod'
     
     defaults:
