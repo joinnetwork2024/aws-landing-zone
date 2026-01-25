@@ -117,24 +117,26 @@ jobs:
 
       - name: OPA Policy Check
         timeout-minutes: 4
-run: |
-          # Use absolute path for policies to avoid "file not found" errors
-          POLICY_PATH="${{ github.workspace }}/policies"
-          
-          if [ -d "$POLICY_PATH" ]; then
-            opa eval --data "$POLICY_PATH" --input tfplan.json "data.terraform.policy.deny" --format json > result.json
-            
-            # Check if 'result' is empty or contains denials
-            DENY_COUNT=$(jq '.result[0].expressions[0].value | length // 0' result.json)
-            
-            if [ "$DENY_COUNT" -gt 0 ]; then
-              echo "❌ Policy Violations Found!"
-              jq '.result[0].expressions[0].value' result.json
+        run: |
+          echo "OPA START $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          opa eval \
+            --data "${{ github.workspace }}/policies/" \
+            --input tfplan.json \
+            "data.terraform.policy.deny" \
+            --format json \
+            > "${{ github.workspace }}/opa_result.json" 2>/dev/null || true
+
+          if [ -f "${{ github.workspace }}/opa_result.json" ]; then
+            VIOLATIONS=$(jq '.result[0].expressions[0].value | length // 0' "${{ github.workspace }}/opa_result.json")
+            if [ "$VIOLATIONS" -gt 0 ]; then
+              echo "❌ Found $VIOLATIONS policy violation(s):"
+              jq -r '.result[0].expressions[0].value[]' "${{ github.workspace }}/opa_result.json"
               exit 1
+            else
+              echo "✅ No violations – policies passed"
             fi
-            echo "✅ Policies Passed"
           else
-            echo "❌ Policy directory not found at $POLICY_PATH"
+            echo "⚠️ OPA produced no output – check Rego syntax or data paths in /policies/"
             exit 1
           fi
           echo "OPA END $(date -u +%Y-%m-%dT%H:%M:%SZ)"
