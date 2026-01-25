@@ -19,8 +19,8 @@ on:
 jobs:
   validate:
     name: Validate ${{ matrix.project }} (${{ matrix.environment }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 12
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
 
     concurrency:
       group: lz-gov-${{ matrix.project }}-${{ matrix.environment }}-${{ github.ref_name }}
@@ -87,7 +87,7 @@ jobs:
           echo "PAUSE END - runner survived 10s idle"
 
       - name: Terraform Validate
-        timeout-minutes: 2
+        timeout-minutes: 3
         run: terraform validate
 
       # ... (keep your existing Generate Plan, Convert to JSON, OPA Check, Cleanup steps unchanged)
