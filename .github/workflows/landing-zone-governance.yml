@@ -16,9 +16,9 @@ on:
       - 'policies/**'
       - 'modules/**'
 
-  permissions:
-    contents: read
-    id-token: write
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
   validate:
