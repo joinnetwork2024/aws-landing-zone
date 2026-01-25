@@ -99,6 +99,24 @@ jobs:
           echo "VALIDATE START $(date -u +%Y-%m-%dT%H:%M:%SZ)"
           terraform validate
           echo "VALIDATE END $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      ############################################
+      # AWS Authentication
+      ############################################
+      - name: Configure AWS Credentials
+        if: matrix.cloud == 'aws'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-west-2
+          role-session-name: github-sec-iac
+
+      - name: Test AWS identity
+        if: matrix.cloud == 'aws'
+        run: aws sts get-caller-identity
+
+      ############################################
+      # AWS Authentication
+      ############################################
 
       - name: Generate Terraform Plan
         timeout-minutes: 6
