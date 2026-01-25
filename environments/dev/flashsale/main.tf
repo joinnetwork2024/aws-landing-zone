@@ -16,7 +16,3 @@ module "flashsale_system" {
 }
 
 
-
-
-
-
