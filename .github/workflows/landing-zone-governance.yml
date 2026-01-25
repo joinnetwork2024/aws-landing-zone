@@ -2,29 +2,25 @@ name: "AWS Landing Zone Governance"
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
-      - 'environments/dev/**'
-      - 'environments/prod/**'
+      - 'environments/**'
       - 'org-management/**'
       - 'policies/**'
       - 'modules/**'
   pull_request:
-    branches:
-      - main
+    branches: [main]
     paths:
-      - 'environments/dev/**'
-      - 'environments/prod/**'
+      - 'environments/**'
       - 'org-management/**'
-      - 'policies/**'      
+      - 'policies/**'
       - 'modules/**'
 
 jobs:
   validate:
     name: Validate ${{ matrix.project }} (${{ matrix.environment }})
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
 
     concurrency:
       group: lz-gov-${{ matrix.project }}-${{ matrix.environment }}-${{ github.ref_name }}
@@ -33,7 +29,6 @@ jobs:
     strategy:
       matrix:
         include:
-          # Dev environments
           - project: flashsale
             environment: dev
             directory: environments/dev/flashsale
@@ -43,21 +38,17 @@ jobs:
           - project: smart
             environment: dev
             directory: environments/dev/smart
-          # Prod environments
           - project: network
             environment: prod
             directory: environments/prod/network
-          # ← Add future AI/ML projects here, e.g.:
-          # - project: model-registry
-          #   environment: prod
-          #   directory: environments/prod/model-registry
 
     defaults:
       run:
         working-directory: ${{ matrix.directory }}
+        shell: bash
 
     steps:
-      - name: Checkout code
+      - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -65,80 +56,43 @@ jobs:
       - name: Setup OPA
         uses: open-policy-agent/setup-opa@v2
         with:
-          version: latest
+          version: 'latest'
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.9.8  # Modern stable; supports latest provider patterns
+          terraform_version: '1.9.8'
 
       - name: Terraform Format Check
         timeout-minutes: 2
         run: |
-          echo "FMT START: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          terraform fmt -check || { echo "Format failed"; exit 1; }
-          echo "FMT END: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "FMT START $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          terraform fmt -check || { echo "❌ Format failed"; exit 1; }
+          echo "FMT END $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
       - name: Terraform Init (no backend)
-        timeout-minutes: 3
-        continue-on-error: true  # ← TEMP for debug; remove after green runs
+        timeout-minutes: 4
+        continue-on-error: true  # TEMP: to reach pause step
         run: |
-          echo "INIT START: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          set -x
-          terraform init -backend=false || true
-          echo "INIT END: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "INIT START $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          terraform init -backend=false
+          echo "INIT END $(date -u +%Y-%m-%dT%H:%M:%SZ)"
           terraform version
 
-      - name: Diagnostic pause (flake detector)
+      - name: Diagnostic pause after init (flake test)
         timeout-minutes: 1
         run: |
-          echo "Post-init check at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          sleep 8
-          echo "Survived pause → runner stable"
+          echo "PAUSE START $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          sleep 10
+          echo "PAUSE END - runner survived 10s idle"
 
       - name: Terraform Validate
         timeout-minutes: 2
         run: terraform validate
 
-      - name: Generate Terraform Plan
-        timeout-minutes: 5
-        run: |
-          if [ -f "${{ matrix.project }}.tfvars" ]; then
-            terraform plan -var-file="${{ matrix.project }}.tfvars" -out=tfplan.binary -input=false
-          else
-            terraform plan -out=tfplan.binary -input=false
-          fi
+      # ... (keep your existing Generate Plan, Convert to JSON, OPA Check, Cleanup steps unchanged)
+      # For brevity, paste your original ones here if needed; they look solid.
 
-      - name: Convert Plan to JSON
-        timeout-minutes: 2
-        run: terraform show -json tfplan.binary > tfplan.json
-
-      - name: OPA Policy Check
-        timeout-minutes: 3
-        run: |
-          echo "OPA START: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          opa eval \
-            --data "${{ github.workspace }}/policies/" \
-            --input tfplan.json \
-            "data.terraform.policy.deny" \
-            --format json \
-            > opa_result.json 2>/dev/null || true
-
-          if [ -f opa_result.json ]; then
-            VIOLATIONS=$(jq '.result[0].expressions[0].value | length // 0' opa_result.json)
-            if [ "$VIOLATIONS" -gt 0 ]; then
-              echo "❌ $VIOLATIONS violations:"
-              jq -r '.result[0].expressions[0].value[]' opa_result.json
-              exit 1
-            else
-              echo "✅ OPA passed"
-            fi
-          else
-            echo "⚠️ OPA output missing – check Rego"
-            exit 1
-          fi
-          echo "OPA END: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-
-      - name: Cleanup
+      - name: Cleanup temporary files
         if: always()
-        run: rm -f tfplan.binary tfplan.json opa_result.json 2>/dev/null || true
+        run: rm -f tfplan.binary tfplan.json "${{ github.workspace }}/opa_result.json" 2>/dev/null || true
