@@ -24,10 +24,3 @@ module "smart_city_traffic" {
 
 
 
-
-
-
-
-
-
-
