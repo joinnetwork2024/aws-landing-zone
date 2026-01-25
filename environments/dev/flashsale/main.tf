@@ -15,3 +15,5 @@ module "flashsale_system" {
   db_password     = var.db_password # Pass from a secret variable
 }
 
+
+
