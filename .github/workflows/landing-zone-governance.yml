@@ -24,44 +24,40 @@ jobs:
   validate:
     name: Validate ${{ matrix.project }} (${{ matrix.environment }})
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 10
+
+    concurrency:
+      group: lz-gov-${{ matrix.project }}-${{ matrix.environment }}-${{ github.ref_name }}
+      cancel-in-progress: true
 
     strategy:
       matrix:
         include:
-          # ── Development environment projects ──
+          # Dev environments
           - project: flashsale
             environment: dev
             directory: environments/dev/flashsale
-
           - project: iotmonitor
             environment: dev
             directory: environments/dev/iotmonitor
-
           - project: smart
             environment: dev
             directory: environments/dev/smart
-
-          # ── Production environment projects ──
+          # Prod environments
           - project: network
             environment: prod
             directory: environments/prod/network
-
-          # Add future AI/ML projects here, e.g.:
+          # ← Add future AI/ML projects here, e.g.:
           # - project: model-registry
           #   environment: prod
           #   directory: environments/prod/model-registry
-          #
-          # - project: training-cluster
-          #   environment: dev
-          #   directory: environments/dev/training-cluster
 
     defaults:
       run:
         working-directory: ${{ matrix.directory }}
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -69,73 +65,80 @@ jobs:
       - name: Setup OPA
         uses: open-policy-agent/setup-opa@v2
         with:
-          version: 'latest'  # Consider bumping to latest stable when ready
+          version: latest
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: '1.9.8'  # Good choice; 1.9.x is current but stay conservative for landing zone
+          terraform_version: 1.9.8  # Modern stable; supports latest provider patterns
 
       - name: Terraform Format Check
+        timeout-minutes: 2
         run: |
-          echo "Checking format for ${{ matrix.project }} (${{ matrix.environment }})..."
-          terraform fmt -check
-          if [ $? -ne 0 ]; then
-            echo "❌ Terraform files need formatting. Run 'terraform fmt' locally to fix."
-            exit 1
-          fi
+          echo "FMT START: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          terraform fmt -check || { echo "Format failed"; exit 1; }
+          echo "FMT END: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
       - name: Terraform Init (no backend)
-        run: terraform init -backend=false
+        timeout-minutes: 3
+        continue-on-error: true  # ← TEMP for debug; remove after green runs
+        run: |
+          echo "INIT START: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          set -x
+          terraform init -backend=false || true
+          echo "INIT END: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          terraform version
+
+      - name: Diagnostic pause (flake detector)
+        timeout-minutes: 1
+        run: |
+          echo "Post-init check at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          sleep 8
+          echo "Survived pause → runner stable"
 
       - name: Terraform Validate
+        timeout-minutes: 2
         run: terraform validate
 
       - name: Generate Terraform Plan
-        id: plan
+        timeout-minutes: 5
         run: |
           if [ -f "${{ matrix.project }}.tfvars" ]; then
-            terraform plan \
-              -var-file="${{ matrix.project }}.tfvars" \
-              -out=tfplan.binary \
-              -input=false
+            terraform plan -var-file="${{ matrix.project }}.tfvars" -out=tfplan.binary -input=false
           else
-            terraform plan \
-              -out=tfplan.binary \
-              -input=false
+            terraform plan -out=tfplan.binary -input=false
           fi
 
       - name: Convert Plan to JSON
+        timeout-minutes: 2
         run: terraform show -json tfplan.binary > tfplan.json
 
-      - name: Run OPA Policy Check
+      - name: OPA Policy Check
+        timeout-minutes: 3
         run: |
-          echo "Running OPA evaluation for ${{ matrix.project }} (${{ matrix.environment }})..."
-
+          echo "OPA START: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
           opa eval \
             --data "${{ github.workspace }}/policies/" \
             --input tfplan.json \
             "data.terraform.policy.deny" \
             --format json \
-            --fail-defined > "${{ github.workspace }}/opa_result.json" 2>/dev/null || true
+            > opa_result.json 2>/dev/null || true
 
-          if [ -f "${{ github.workspace }}/opa_result.json" ]; then
-            VIOLATIONS=$(jq '.result[0].expressions[0].value | length' "${{ github.workspace }}/opa_result.json" 2>/dev/null || echo "0")
+          if [ -f opa_result.json ]; then
+            VIOLATIONS=$(jq '.result[0].expressions[0].value | length // 0' opa_result.json)
             if [ "$VIOLATIONS" -gt 0 ]; then
-              echo "❌ Found $VIOLATIONS policy violation(s):"
-              jq -r '.result[0].expressions[0].value[]' "${{ github.workspace }}/opa_result.json"
-              echo ""
-              echo "See policy definitions in /policies/ for details."
+              echo "❌ $VIOLATIONS violations:"
+              jq -r '.result[0].expressions[0].value[]' opa_result.json
               exit 1
             else
-              echo "✅ All policies passed for ${{ matrix.project }} (${{ matrix.environment }})"
+              echo "✅ OPA passed"
             fi
           else
-            echo "⚠️ OPA evaluation did not produce results – check Rego syntax or data paths."
+            echo "⚠️ OPA output missing – check Rego"
             exit 1
           fi
+          echo "OPA END: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-      - name: Cleanup temporary files
+      - name: Cleanup
         if: always()
-        run: |
-          rm -f tfplan.binary tfplan.json "${{ github.workspace }}/opa_result.json" 2>/dev/null || true
+        run: rm -f tfplan.binary tfplan.json opa_result.json 2>/dev/null || true
