@@ -9,47 +9,112 @@ on:
       - 'environments/prod/**'
       - 'org-management/**'
       - 'policies/**'
+      - 'modules/**'
   pull_request:
     branches:
       - main
+    paths:
+      - 'environments/dev/**'
+      - 'environments/prod/**'
+      - 'org-management/**'
+      - 'policies/**'      
+      - 'modules/**'
 
 jobs:
-  opa-governance-check:
+  validate-infrastructure-policies:
     name: "Validate Infrastructure Policies"
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+    strategy:
+      matrix:
+        environment: ['dev', 'prod']
+        include:
+          - environment: 'dev'
+            working_directory: './environments/dev'
+          - environment: 'prod'
+            working_directory: './environments/prod'
+    
+    defaults:
+      run:
+        working-directory: ${{ matrix.working_directory }}
 
-      - name: Setup OPA
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for proper terraform operations
+          submodules: recursive
+
+      - name: Setup OPA (Open Policy Agent)
         uses: open-policy-agent/setup-opa@v2
         with:
-          version: latest
+          version: '0.58.0'
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.6.0'
 
-      - name: Terraform Init
-        run: terraform init
-
-      - name: Generate Terraform Plan
-        run: terraform plan -out=tfplan
-
-      # OPA requires JSON, so we convert the binary plan file
-      - name: Convert Plan to JSON
-        run: terraform show -json tfplan > tfplan.json
-
-      # Run the evaluation
-      - name: OPA Policy Evaluation
-        id: opa_check
+      - name: Terraform Format Check
         run: |
-          # The --fail-defined flag ensures the job fails if a 'deny' rule is met
-          # We evaluate the "deny" path in our Rego package
-          RESULT=$(opa eval -i tfplan.json -d policies/ "data.terraform.security.deny" --format json --fail-defined)
-          
-          # Check if the result array is not empty
-          if [[ $(echo $RESULT | jq '.result[0].expressions[0].value | length') -gt 0 ]]; then
-            echo "Policy Violations Detected:"
-            echo $RESULT | jq '.result[0].expressions[0].value'
+          terraform fmt -check -recursive
+          if [ $? -ne 0 ]; then
+            echo "Some Terraform files need formatting. Run 'terraform fmt' to fix."
             exit 1
           fi
+
+      - name: Terraform Init
+        run: terraform init -backend=false
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Generate Terraform Plan
+        run: |
+          terraform plan \
+            -var-file="terraform.tfvars" \
+            -var="environment=${{ matrix.environment }}" \
+            -out=tfplan.binary \
+            -input=false \
+            -lock=false
+
+      - name: Convert Plan to JSON
+        id: convert_plan
+        run: |
+          terraform show -json tfplan.binary > tfplan.json
+          echo "PLAN_JSON=$(pwd)/tfplan.json" >> $GITHUB_OUTPUT
+
+      - name: Run OPA Policy Evaluation
+        id: opa_evaluation
+        run: |
+          # Navigate back to root to access policies
+          cd ${{ github.workspace }}
+          
+          echo "Evaluating policies for ${{ matrix.environment }} environment..."
+          
+          # Run OPA evaluation with the plan
+          opa eval \
+            --data ./policies/ \
+            --input ${{ steps.convert_plan.outputs.PLAN_JSON }} \
+            "data.terraform.policy.deny" \
+            --format json \
+            --fail-defined > opa_result.json || true
+          
+          # Process OPA results
+          if [ -f opa_result.json ]; then
+            VIOLATIONS=$(jq '.result[0].expressions[0].value | length' opa_result.json)
+            if [ "$VIOLATIONS" -gt 0 ]; then
+              echo "❌ Found $VIOLATIONS policy violations in ${{ matrix.environment }} environment:"
+              jq '.result[0].expressions[0].value[]' opa_result.json
+              exit 1
+            else
+              echo "✅ No policy violations found in ${{ matrix.environment }} environment"
+            fi
+          else
+            echo "⚠️ No OPA results generated"
+            exit 1
+          fi
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f tfplan.binary tfplan.json opa_result.json 2>/dev/null || true
