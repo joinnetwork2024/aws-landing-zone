@@ -67,17 +67,18 @@ jobs:
         timeout-minutes: 2
         run: |
           echo "FMT START $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          terraform fmt -check || { echo "❌ Format failed"; exit 1; }
+          terraform fmt -check || { echo "❌ Format failed – run terraform fmt locally"; exit 1; }
           echo "FMT END $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
       - name: Terraform Init (no backend)
-        timeout-minutes: 4
-        continue-on-error: true  # TEMP: to reach pause step
+        timeout-minutes: 5
         run: |
           echo "INIT START $(date -u +%Y-%m-%dT%H:%M:%SZ)"
           terraform init -backend=false
           echo "INIT END $(date -u +%Y-%m-%dT%H:%M:%SZ)"
           terraform version
+          echo "Init done – short bridge to reduce handover flake"
+          sleep 3
 
       - name: Diagnostic pause after init (flake test)
         timeout-minutes: 1
@@ -86,13 +87,60 @@ jobs:
           sleep 10
           echo "PAUSE END - runner survived 10s idle"
 
+      - name: Keep-runner-warm bridge
+        run: |
+          echo "BRIDGE $(date -u +%Y-%m-%dT%H:%M:%SZ) - keeping process active"
+          date && pwd && ls -la
+
       - name: Terraform Validate
         timeout-minutes: 3
-        run: terraform validate
+        run: |
+          echo "VALIDATE START $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          terraform validate
+          echo "VALIDATE END $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-      # ... (keep your existing Generate Plan, Convert to JSON, OPA Check, Cleanup steps unchanged)
-      # For brevity, paste your original ones here if needed; they look solid.
+      - name: Generate Terraform Plan
+        timeout-minutes: 6
+        run: |
+          echo "PLAN START $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          if [ -f "${{ matrix.project }}.tfvars" ]; then
+            terraform plan -var-file="${{ matrix.project }}.tfvars" -out=tfplan.binary -input=false
+          else
+            terraform plan -out=tfplan.binary -input=false
+          fi
+          echo "PLAN END $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+      - name: Convert Plan to JSON
+        timeout-minutes: 2
+        run: terraform show -json tfplan.binary > tfplan.json
+
+      - name: OPA Policy Check
+        timeout-minutes: 4
+        run: |
+          echo "OPA START $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          opa eval \
+            --data "${{ github.workspace }}/policies/" \
+            --input tfplan.json \
+            "data.terraform.policy.deny" \
+            --format json \
+            > "${{ github.workspace }}/opa_result.json" 2>/dev/null || true
+
+          if [ -f "${{ github.workspace }}/opa_result.json" ]; then
+            VIOLATIONS=$(jq '.result[0].expressions[0].value | length // 0' "${{ github.workspace }}/opa_result.json")
+            if [ "$VIOLATIONS" -gt 0 ]; then
+              echo "❌ Found $VIOLATIONS policy violation(s):"
+              jq -r '.result[0].expressions[0].value[]' "${{ github.workspace }}/opa_result.json"
+              exit 1
+            else
+              echo "✅ No violations – policies passed"
+            fi
+          else
+            echo "⚠️ OPA produced no output – check Rego syntax or data paths in /policies/"
+            exit 1
+          fi
+          echo "OPA END $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
       - name: Cleanup temporary files
         if: always()
-        run: rm -f tfplan.binary tfplan.json "${{ github.workspace }}/opa_result.json" 2>/dev/null || true
+        run: |
+          rm -f tfplan.binary tfplan.json "${{ github.workspace }}/opa_result.json" 2>/dev/null || true
