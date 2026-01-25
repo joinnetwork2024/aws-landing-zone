@@ -24,6 +24,7 @@ jobs:
   validate:
     name: Validate ${{ matrix.project }} (${{ matrix.environment }})
     runs-on: ubuntu-latest
+    timeout-minutes: 12
 
     strategy:
       matrix:
@@ -68,12 +69,12 @@ jobs:
       - name: Setup OPA
         uses: open-policy-agent/setup-opa@v2
         with:
-          version: '0.58.0'  # Consider bumping to latest stable when ready
+          version: 'latest'  # Consider bumping to latest stable when ready
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: '1.6.0'  # Good choice; 1.9.x is current but stay conservative for landing zone
+          terraform_version: '1.9.8'  # Good choice; 1.9.x is current but stay conservative for landing zone
 
       - name: Terraform Format Check
         run: |
