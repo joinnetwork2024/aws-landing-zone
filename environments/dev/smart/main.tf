@@ -20,3 +20,5 @@ module "smart_city_traffic" {
 
   # Azure-specific vars if needed
 }
+
+
