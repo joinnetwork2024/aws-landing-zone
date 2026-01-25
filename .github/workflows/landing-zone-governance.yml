@@ -16,6 +16,10 @@ on:
       - 'policies/**'
       - 'modules/**'
 
+  permissions:
+    contents: read
+    id-token: write
+
 jobs:
   validate:
     name: Validate ${{ matrix.project }} (${{ matrix.environment }})
