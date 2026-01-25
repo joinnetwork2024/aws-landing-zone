@@ -112,7 +112,6 @@ jobs:
       # AWS Authentication
       ############################################
       - name: Configure AWS Credentials
-        if: matrix.cloud == 'aws'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
