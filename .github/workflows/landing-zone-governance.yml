@@ -21,10 +21,16 @@ jobs:
     name: Validate ${{ matrix.project }} (${{ matrix.environment }})
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    environment: region
 
     concurrency:
       group: ${{ github.workflow }}-${{ matrix.project }}-${{ matrix.environment }}-${{ github.event.pull_request.number || github.ref }}
       cancel-in-progress: true
+
+    env:
+      TF_VAR_region: ${{ vars.REGION }}
+      TF_VAR_location: ${{ vars.LOCATION }}
+      TF_VAR_project_name: ${{ vars.PROJECT_NAME }}
 
     strategy:
       fail-fast: false
