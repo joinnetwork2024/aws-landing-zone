@@ -20,6 +20,3 @@ module "flashsale_system" {
 
 
 
-
-
-
