@@ -17,3 +17,5 @@ variable "project_name" {
   default     = "landing"
   type        = string
 }
+
+
