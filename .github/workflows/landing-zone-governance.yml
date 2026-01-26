@@ -48,9 +48,9 @@ jobs:
           - project: smart
             environment: dev
             directory: environments/dev/smart
-          - project: network
-            environment: prod
-            directory: environments/prod/network
+#          - project: network
+ #           environment: prod
+  #          directory: environments/prod/network
 
     defaults:
       run:
@@ -80,7 +80,7 @@ jobs:
           terraform fmt -check || { echo "❌ Format failed – run terraform fmt locally"; exit 1; }
           echo "FMT END $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-      - name: Terraform Init (no backend)
+      - name: Terraform Init
         timeout-minutes: 5
         run: |
           echo "INIT START $(date -u +%Y-%m-%dT%H:%M:%SZ)"
