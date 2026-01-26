@@ -84,7 +84,7 @@ jobs:
         timeout-minutes: 5
         run: |
           echo "INIT START $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          terraform init -backend=false
+          terraform init 
           echo "INIT END $(date -u +%Y-%m-%dT%H:%M:%SZ)"
           terraform version
           echo "Init done – short bridge to reduce handover flake"
