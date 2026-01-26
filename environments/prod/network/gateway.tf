@@ -16,7 +16,7 @@ module "gateway" {
 
 module "mc_gateway" {
   source  = "terraform-aviatrix-modules/mc-gateway/aviatrix"
-  version = "~> 1.7.0" # Latest compatible
+  version = "~> 1.3.1" # Latest compatible
 
   cloud            = "AWS"
   name             = "${var.gateway_name}-avaitrix-vm" # e.g., "transit-gateway-uk"
