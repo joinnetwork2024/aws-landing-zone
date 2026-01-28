@@ -144,7 +144,7 @@ jobs:
       - name: Install Infracost
         run: |
           curl -fsSL https://raw.githubusercontent.com/infracost/infracost/master/scripts/install.sh | sh
-          sudo mv infracost-linux-amd64 /usr/local/bin/infracost
+        
 
       - name: Run Infracost breakdown
         run: |
