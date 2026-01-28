@@ -140,6 +140,18 @@ jobs:
         timeout-minutes: 2
         run: terraform show -json tfplan.binary > tfplan.json
 
+
+            - name: Infracost Breakdown
+        uses: infracost/actions@v2
+        with:
+          path: tfplan.json
+        env:
+          INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
+          
+
+      - name: Output Infracost results
+        run: cat infracost-output.json
+
       - name: OPA Policy Check
         timeout-minutes: 4
         run: |
