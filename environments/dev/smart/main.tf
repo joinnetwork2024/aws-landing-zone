@@ -23,7 +23,67 @@ module "smart_city_traffic" {
 
 
 
+locals {
+  # Define a map for your common tags
+  prefix = "${var.env}-smart-traffic"
+
+  common_tags = {
+    Project     = "AI Training Data"
+    Environment = "dev"
+    CostCenter  = "Sensitive-ML"
+  }
+}
+
+# # Timestream Ingest Endpoint
+# resource "aws_vpc_endpoint" "timestream_ingest" {
+#   count             = var.cloud_provider == "aws" ? 1 : 0
+#   vpc_id            = module.dev_network.vpc_id # Direct reference
+#   service_name      = "com.amazonaws.${var.aws_region}.timestream.write"
+#   vpc_endpoint_type = "Interface"
+#   subnet_ids        = module.dev_network.private_subnets # Direct
+#   security_group_ids = [
+
+#     aws_security_group.timestream_endpoints_sg.id # Or dedicated
+#   ]
+#   private_dns_enabled = true
+
+#   tags = local.common_tags
+# }
+
+# # Timestream Query Endpoint
+# resource "aws_vpc_endpoint" "timestream_query" {
+#   count             = var.cloud_provider == "aws" ? 1 : 0
+#   vpc_id            = module.dev_network.vpc_id
+#   service_name      = "com.amazonaws.${var.aws_region}.timestream.query"
+#   vpc_endpoint_type = "Interface"
+#   subnet_ids        = module.dev_network.private_subnets
+#   security_group_ids = [
+#     aws_security_group.timestream_endpoints_sg.id
+#   ]
+#   private_dns_enabled = true
+
+#   tags = local.common_tags
+# }
 
 
+# Multi-AZ NAT (resilient outbound)
+resource "aws_eip" "nat" {
+  count = var.cloud_provider == "aws" ? length(module.dev_network.public_subnets) : 0
+  vpc   = true
+  tags  = merge(local.common_tags, { Purpose = "nat-outbound-timestream" })
+}
 
+resource "aws_nat_gateway" "private_outbound" {
+  count         = var.cloud_provider == "aws" ? length(module.dev_network.public_subnets) : 0
+  allocation_id = aws_eip.nat[count.index].id
+  subnet_id     = module.dev_network.public_subnets[count.index]
+  tags          = merge(local.common_tags, { Purpose = "timestream-public-outbound" })
+}
 
+# NAT Route on Private RTs
+resource "aws_route" "private_to_nat" {
+  count                  = var.cloud_provider == "aws" ? length(module.dev_network.private_route_table_ids) : 0
+  route_table_id         = module.dev_network.private_route_table_ids[count.index]
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id         = aws_nat_gateway.private_outbound[count.index].id
+}

@@ -1,68 +1,14 @@
-# Convert CSV to DeepAR JSONLines format (use Lambda or script; for simplicity, assume preprocessed)
-# S3 path for training data: s3://${aws_s3_bucket.traffic_archive[0].bucket}/training/traffic_data.jsonl
+# Data Source for Account ID (conditional – fix indexing in policy)
+data "aws_caller_identity" "current" {
+  count = var.cloud_provider == "aws" ? 1 : 0
+}
 
-# resource "aws_sagemaker_training_job" "traffic_forecast_training" {
-#   count = var.cloud_provider == "aws" ? 1 : 0
-
-#   name = "${local.prefix}-training-job"
-#   role_arn = aws_iam_role.sagemaker[0].arn
-
-#   algorithm_specification {
-#     training_image = "462105765813.dkr.ecr.${var.aws_region}.amazonaws.com/forecasting-deepar:1"  # DeepAR algo image (adjust region)
-#     training_input_mode = "File"
-#   }
-
-#   input_data_config {
-#     channel_name = "train"
-#     data_source {
-#       s3_data_source {
-#         s3_data_type = "S3Prefix"
-#         s3_uri = "s3://${aws_s3_bucket.traffic_archive[0].bucket}/training/"
-#         s3_data_distribution_type = "FullyReplicated"
-#       }
-#     }
-#     content_type = "application/jsonlines"
-#     compression_type = "None"
-#   }
-
-#   output_data_config {
-#     s3_output_path = "s3://${aws_s3_bucket.traffic_archive[0].bucket}/models/"
-#   }
-
-#   resource_config {
-#     instance_type = "ml.m5.large"
-#     instance_count = 1
-#     volume_size_in_gb = 10
-#   }
-
-#   stopping_condition {
-#     max_runtime_in_seconds = 3600
-#   }
-
-#   hyper_parameters = {
-#     "time_freq" = "H"  # Hourly
-#     "context_length" = "24"  # Look back 1 day
-#     "prediction_length" = "1"  # Predict next hour
-#     "epochs" = "100"
-#     "num_layers" = "2"
-#     "num_cells" = "50"
-#     "mini_batch_size" = "32"
-#     "learning_rate" = "0.001"
-#   }
-
-#   vpc_config {
-#     security_group_ids = [aws_security_group.sagemaker_sg[0].id]
-#     subnets = var.private_subnets
-#   }
-
-#   enable_network_isolation = true
-#   enable_managed_spot_training = false
-# }
-
+# Dedicated Least-Privilege Role for Step Functions Retraining Orchestration
 resource "aws_iam_role" "stepfunctions_sagemaker" {
   count = var.cloud_provider == "aws" ? 1 : 0
 
-  name = "${local.prefix}-sfn-sagemaker"
+  name = "${local.prefix}-sfn-sagemaker"  # Consistent naming (dev-smart-traffic-sfn-sagemaker)
+
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -71,13 +17,17 @@ resource "aws_iam_role" "stepfunctions_sagemaker" {
       Principal = { Service = "states.amazonaws.com" }
     }]
   })
+
+  tags = local.common_tags  # Or local.effective_tags
 }
 
+# Broad SageMaker Invocation + S3/Logs (scope Resource in prod)
 resource "aws_iam_role_policy" "stepfunctions_sagemaker_policy" {
   count = var.cloud_provider == "aws" ? 1 : 0
 
   name = "${local.prefix}-sfn-sagemaker-policy"
   role = aws_iam_role.stepfunctions_sagemaker[0].id
+
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -91,10 +41,14 @@ resource "aws_iam_role_policy" "stepfunctions_sagemaker_policy" {
           "sagemaker:DescribeModel",
           "sagemaker:CreateEndpointConfig",
           "sagemaker:CreateEndpoint",
-          "sagemaker:UpdateEndpoint",
-          "iam:PassRole"
+          "sagemaker:UpdateEndpoint"
         ]
-        Resource = "*"
+        Resource = "*"  # Scope to specific ARNs in prod (e.g., training jobs prefixed)
+      },
+      {
+        Effect   = "Allow"
+        Action   = "iam:PassRole"
+        Resource = aws_iam_role.sagemaker[0].arn  # Scoped PassRole for training
       },
       {
         Effect   = "Allow"
@@ -110,22 +64,48 @@ resource "aws_iam_role_policy" "stepfunctions_sagemaker_policy" {
   })
 }
 
-# Minimal Step Functions state machine example (expand with full ASL definition)
+# Scoped Events Permissions for Managed Rules (Retraining Triggers)
+resource "aws_iam_role_policy" "sfn_managed_rules" {
+  count = var.cloud_provider == "aws" ? 1 : 0
+  name  = "${local.prefix}-sfn-managed-rules"
+  role  = aws_iam_role.stepfunctions_sagemaker[0].id  # Fixed: Reference existing consolidated role
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = [
+          "events:PutRule",
+          "events:PutTargets",
+          "events:DescribeRule",
+          "events:DeleteRule",
+          "events:RemoveTargets",
+          "events:ListRules",
+          "events:ListTargetsByRule"
+        ]
+        Resource = "arn:aws:events:${var.aws_region}:${data.aws_caller_identity.current[0].account_id}:rule/StepFunctions*"  # Fixed: [0] indexing + scoped to SFN-managed rules
+      }
+    ]
+  })
+}
+
+# Step Functions State Machine for Retraining (uses consolidated role)
 resource "aws_sfn_state_machine" "traffic_model_retrain" {
   count = var.cloud_provider == "aws" ? 1 : 0
 
   name     = "${local.prefix}-retrain"
-  role_arn = aws_iam_role.stepfunctions_sagemaker[0].arn
+  role_arn = aws_iam_role.stepfunctions_sagemaker[0].arn  # Consolidated role
 
   definition = jsonencode({
-    Comment = "Orchestrate SageMaker training + model update"
+    Comment = "Orchestrate SageMaker DeepAR training + model update on traffic data lineage"
     StartAt = "StartTraining"
     States = {
       StartTraining = {
         Type       = "Task"
         Resource   = "arn:aws:states:::sagemaker:createTrainingJob.sync"
         Parameters = {
-          "TrainingJobName.$" = "States.Format('${local.prefix}-training-{}', $$.Execution.StartTime)"  # ← FIXED: "Name.$" syntax
+          "TrainingJobName.$" = "States.Format('${local.prefix}-training-{}', $$.Execution.StartTime)"
           AlgorithmSpecification = {
             TrainingImage     = "462105765813.dkr.ecr.${var.aws_region}.amazonaws.com/forecasting-deepar:1"
             TrainingInputMode = "File"
@@ -171,11 +151,13 @@ resource "aws_sfn_state_machine" "traffic_model_retrain" {
           EnableNetworkIsolation   = true
           EnableManagedSpotTraining = false
         }
-        Next = "Success"  # ← Expand later with more states (CreateModel, UpdateEndpoint, etc.)
+        Next = "Success"  # Expand with bias evaluation, registry promotion states
       }
       Success = {
         Type = "Succeed"
       }
     }
   })
+
+  tags = local.common_tags
 }

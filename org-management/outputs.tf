@@ -23,12 +23,12 @@ output "cloudtrail_trail_arn" {
 # S3 Bucket
 output "cloudtrail_s3_bucket_id" {
   description = "The ID (name) of the S3 bucket used for CloudTrail logs."
-  value       = aws_s3_bucket.tf_state.id
+  value       = aws_s3_bucket.cloudtrail_logs.id
 }
 
 output "cloudtrail_s3_bucket_arn" {
   description = "The ARN of the S3 bucket used for CloudTrail logs."
-  value       = aws_s3_bucket.tf_state.arn
+  value       = aws_s3_bucket.cloudtrail_logs.arn
 }
 
 # CloudWatch Log Group

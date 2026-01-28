@@ -18,7 +18,7 @@ locals {
 # Secondary region provider for cross-region replication
 provider "aws" {
   alias  = "secondary"
-  region = "eu-west-2"  # Adjust to your actual secondary region
+  region = "eu-west-1"  # Adjust to your actual secondary region
 }
 
 # IoT Ingestion (Devices → Stream)
@@ -256,6 +256,41 @@ resource "aws_s3_bucket_notification" "traffic_archive" {
   }
 }
 
+resource "aws_glue_catalog_database" "traffic_db" {
+  count = var.cloud_provider == "aws" ? 1 : 0
+  name  = "${local.prefix}-db"
+}
+
+resource "aws_glue_catalog_table" "traffic_parquet" {
+  count         = var.cloud_provider == "aws" ? 1 : 0
+  database_name = aws_glue_catalog_database.traffic_db[0].name
+  name          = "traffic_parquet"
+
+  table_type = "EXTERNAL_TABLE"
+  parameters = {
+    "classification" = "parquet"
+  }
+
+  storage_descriptor {
+    location = "s3://${aws_s3_bucket.traffic_archive[0].bucket}/parquet/"
+    input_format  = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
+    output_format = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
+    ser_de_info {
+      name                  = "ParquetSerDe"
+      serialization_library = "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"
+    }
+    columns {
+      name = "timestamp"
+      type = "timestamp"
+    }
+    columns {
+      name = "zone_id"
+      type = "string"
+    }
+    # Add columns matching your sensor schema (zone, volume, speed, etc.)
+  }
+}
+
 # Kinesis Firehose for S3 Delivery
 resource "aws_kinesis_firehose_delivery_stream" "to_archive" {
   count = var.cloud_provider == "aws" ? 1 : 0
@@ -268,7 +303,7 @@ resource "aws_kinesis_firehose_delivery_stream" "to_archive" {
     role_arn           = aws_iam_role.firehose[0].arn
   }
 
-  extended_s3_configuration {
+extended_s3_configuration {
     role_arn           = aws_iam_role.firehose[0].arn
     bucket_arn         = aws_s3_bucket.traffic_archive[0].arn
     buffering_size     = 128
@@ -288,8 +323,8 @@ resource "aws_kinesis_firehose_delivery_stream" "to_archive" {
       }
       schema_configuration {
         role_arn      = aws_iam_role.firehose[0].arn
-        database_name = "traffic_glue_db"  # Assume Glue DB exists or add resource
-        table_name    = "traffic_parquet"
+        database_name = aws_glue_catalog_database.traffic_db[0].name  # Fixed: Dynamic reference to created DB
+        table_name    = aws_glue_catalog_table.traffic_parquet[0].name  # Fixed: Dynamic table
         region        = var.aws_region
       }
     }
@@ -332,19 +367,19 @@ resource "aws_security_group" "sagemaker_sg" {
   }
 }
 
-resource "aws_sagemaker_endpoint_configuration" "forecast" {
-  count = var.cloud_provider == "aws" ? 1 : 0
+# resource "aws_sagemaker_endpoint_configuration" "forecast" {
+#   count = var.cloud_provider == "aws" ? 1 : 0
 
-  name = "${local.prefix}-config"
-  kms_key_arn = aws_kms_key.data_key[0].arn  # Fixed: Encryption at rest
+#   name = "${local.prefix}-config"
+#   kms_key_arn = aws_kms_key.data_key[0].arn  # Fixed: Encryption at rest
 
-  production_variants {
-    variant_name           = "primary"
-    model_name             = aws_sagemaker_model.traffic_forecast[0].name
-    initial_instance_count = 1
-    instance_type          = "ml.m5.large"
-  }
-}
+#   production_variants {
+#     variant_name           = "primary"
+#     model_name             = aws_sagemaker_model.traffic_forecast[0].name
+#     initial_instance_count = 1
+#     instance_type          = "ml.m5.large"
+#   }
+# }
 
 resource "aws_sagemaker_endpoint" "traffic_forecast" {
   count = var.cloud_provider == "aws" ? 1 : 0
@@ -493,7 +528,7 @@ resource "aws_sns_topic_subscription" "email" {
 
 # Edge Processing (Greengrass / IoT Edge)
 resource "awscc_greengrassv2_component_version" "traffic_edge" {
-  count = var.cloud_provider == "aws" ? 1 : 0
+  count = var.cloud_provider == "aws" && var.greengrass_artifact_s3_uri != "" ? 1 : 0
 
   inline_recipe = jsonencode({
     RecipeFormatVersion = "2020-01-25"
@@ -507,7 +542,7 @@ resource "awscc_greengrassv2_component_version" "traffic_edge" {
         }
         Artifacts = [
           {
-            URI = "s3://your-bucket/path/to/artifact.zip"  # Upload your edge code artifact
+            URI = var.greengrass_artifact_s3_uri  # Upload your edge code artifact
           }
         ]
       }
@@ -646,6 +681,34 @@ resource "aws_iam_role" "sagemaker" {
   })
 }
 
+resource "aws_iam_role_policy" "sfn_additional" {
+  count = var.cloud_provider == "aws" ? 1 : 0
+  name   = "${local.prefix}-sfn-managed-rule"
+  role   = aws_iam_role.sagemaker[0].id  # Or your SFN-specific role
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = [
+          "iam:PassRole"  # Required for SFN to assume SageMaker roles
+        ]
+        Resource = aws_iam_role.sagemaker[0].arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = [
+          "events:PutRule",
+          "events:PutTargets",
+          "events:DescribeRule"
+        ]
+        Resource = "*"  # Scope to specific rules in prod
+      }
+    ]
+  })
+}
+
 resource "aws_iam_role_policy" "sagemaker_policy" {
   count = var.cloud_provider == "aws" ? 1 : 0
 
@@ -715,7 +778,79 @@ resource "aws_iam_role_policy" "lambda_policy" {
 }
 
 # Data sources
-data "aws_caller_identity" "current" {
+# data "aws_caller_identity" "current" {
+#   count = var.cloud_provider == "aws" ? 1 : 0
+# }
+
+resource "aws_sagemaker_endpoint_configuration" "forecast" {
   count = var.cloud_provider == "aws" ? 1 : 0
+
+  name        = "${local.prefix}-config"
+  kms_key_arn = aws_kms_key.data_key[0].arn  # Encryption at rest (already good)
+
+  production_variants {
+    variant_name           = "primary"
+    model_name             = aws_sagemaker_model.traffic_forecast[0].name
+    initial_instance_count = 1
+    instance_type          = var.env == "dev" ? "ml.m5.large" : "ml.m5.xlarge"  # Dev cheaper
+  }
+
+  # NEW: Mandatory Data Capture for Monitoring & Bias Audits
+  data_capture_config {
+    enable_capture              = true
+    initial_sampling_percentage  = var.env == "dev" ? 100 : 50  # Full capture in dev
+    destination_s3_uri          = "s3://${aws_s3_bucket.traffic_archive[0].bucket}/monitoring/data-capture/${var.env}/"
+    kms_key_id                  = aws_kms_key.data_key[0].arn  # Encrypt captured data
+
+    capture_options {
+      capture_mode = "Input"
+    }
+    capture_options {
+      capture_mode = "Output"
+    }
+
+    capture_content_type_header {
+      csv_content_types  = ["text/csv"]
+      json_content_types = ["application/json"]
+    }
+  }
+
+  tags = merge(local.common_tags, { Purpose = "smartcity-traffic-prediction" })
 }
 
+resource "aws_iam_role_policy" "sagemaker_ecr_pull" {
+  count = var.cloud_provider == "aws" ? 1 : 0
+  name  = "${local.prefix}-sagemaker-ecr-pull"
+  role  = aws_iam_role.sagemaker[0].id  # Your SageMaker execution role
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = [
+          "ecr:GetAuthorizationToken"  # Required for any ECR auth
+        ]
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = [
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage"
+        ]
+        Resource = "arn:aws:ecr:${var.aws_region}:462105765813:repository/forecasting-deepar*"  # Scoped to DeepAR repo only
+      }
+    ]
+  })
+}
+
+locals {
+  # Define a map for your common tags
+  common_tags = {
+    Project     = "AI Training Data"
+    Environment = "dev"
+    CostCenter  = "Sensitive-ML"
+  }
+}

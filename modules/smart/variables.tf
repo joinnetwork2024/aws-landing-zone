@@ -43,7 +43,7 @@ variable "sagemaker_model" {
 variable "aws_region" {
   description = "AWS region (if cloud_provider = aws)"
   type        = string
-  default     = "eu-west-2"
+  default     = "eu-west-1"
 }
 
 variable "edge_enabled" {
@@ -52,3 +52,8 @@ variable "edge_enabled" {
   default     = true
 }
 
+variable "greengrass_artifact_s3_uri" {
+  description = "S3 URI of signed edge component ZIP (e.g., s3://smartcity-artifacts-dev/traffic-edge-v1.zip). Required for production; placeholder in dev."
+  type        = string
+  default     = ""  # Empty triggers warning or skip in dev
+}
