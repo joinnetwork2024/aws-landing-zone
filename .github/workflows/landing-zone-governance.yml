@@ -150,7 +150,7 @@ jobs:
         run: |
           infracost breakdown \
             --path=tfplan.json \
-            --format=json \
+            --format=table \
             --out-file=infracost-output.json
         env:
           INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
