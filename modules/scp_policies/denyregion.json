@@ -1,0 +1,46 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyNonApprovedRegions",
+      "Effect": "Deny",
+      "NotAction": [
+        "aoss:*",
+        "acm:*",
+        "aws-marketplace:*",
+        "chime:*",
+        "cloudfront:*",
+        "directconnect:*",
+        "iam:*",
+        "organizations:*",
+        "route53:*",
+        "s3:GetAccountPublicAccessBlock",
+        "s3:GetBucketLocation",
+        "s3:ListAllMyBuckets",
+        "s3:ListJobs",
+        "s3:ListMultiRegionAccessPoints",
+      
+        "s3:GetBucketAcl",
+        "s3:GetBucketCORS",
+        "s3:GetBucketLogging",
+        "s3:GetBucketNotification",
+        "s3:GetBucketPolicy",
+        "s3:GetBucketTagging",
+        "s3:GetBucketVersioning",
+        "s3:GetBucketWebsite",
+        "s3:ListBucket",
+        "sts:*",
+        "support:*"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringNotEquals": {
+          "aws:RequestedRegion": [
+            "eu-west-2",
+            "eu-central-1"
+          ]
+        }
+      }
+    }
+  ]
+}
