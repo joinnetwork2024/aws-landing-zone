@@ -12,8 +12,8 @@ terraform {
 locals {
   mandatory_tags = {
     CostCenter  = "IOT-MONITOR" # ← change to your real value
-    Environment = "dev"      # ← or use var.env
-    Owner       = "APP Team" # or your name/email
+    Environment = "dev"         # ← or use var.env
+    Owner       = "APP Team"    # or your name/email
   }
 }
 
