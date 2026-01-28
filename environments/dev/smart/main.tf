@@ -65,7 +65,6 @@ locals {
 #   tags = local.common_tags
 # }
 
-
 # Multi-AZ NAT (resilient outbound)
 resource "aws_eip" "nat" {
   count = var.cloud_provider == "aws" ? length(module.dev_network.public_subnets) : 0
