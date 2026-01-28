@@ -18,5 +18,5 @@ module "iot_monitoring" {
   # Optional - you can pass these from variables/secrets
   timestream_database_name = "iot_monitoring_dev"
   kinesis_shard_count      = 50 # adjust according to expected load
-  alert_email              = "joejo201770@gmail.com"
+  alert_email              = "yougotnowheretogo@hotmail.com"
 }

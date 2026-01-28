@@ -18,7 +18,7 @@ locals {
 # Secondary region provider for cross-region replication
 provider "aws" {
   alias  = "secondary"
-  region = "eu-west-1"  # Adjust to your actual secondary region
+  region = "eu-west-2"  # Adjust to your actual secondary region
 }
 
 # IoT Ingestion (Devices → Stream)

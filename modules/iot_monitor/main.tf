@@ -24,28 +24,28 @@ resource "aws_kinesis_stream" "iot_data" {
 # ──────────────────────────────────────────────────────────────────────────────
 # Timestream - Hot path / real-time analytics
 # ──────────────────────────────────────────────────────────────────────────────
-resource "aws_timestreamwrite_database" "iot" {
-  database_name = local.timestream_db_name
+# resource "aws_timestreamwrite_database" "iot" {
+#   database_name = local.timestream_db_name
 
-  tags = {
-    Environment = var.env
-    Purpose     = "iot-hot-path"
-  }
-}
+#   tags = {
+#     Environment = var.env
+#     Purpose     = "iot-hot-path"
+#   }
+# }
 
-resource "aws_timestreamwrite_table" "sensors" {
-  database_name = aws_timestreamwrite_database.iot.database_name
-  table_name    = "sensors"
+# resource "aws_timestreamwrite_table" "sensors" {
+#   database_name = aws_timestreamwrite_database.iot.database_name
+#   table_name    = "sensors"
 
-  retention_properties {
-    magnetic_store_retention_period_in_days = 365   # 1 year in magnetic
-    memory_store_retention_period_in_hours  = 24    # 1 day in memory
-  }
+#   retention_properties {
+#     magnetic_store_retention_period_in_days = 365   # 1 year in magnetic
+#     memory_store_retention_period_in_hours  = 24    # 1 day in memory
+#   }
 
-  tags = {
-    Environment = var.env
-  }
-}
+#   tags = {
+#     Environment = var.env
+#   }
+# }
 
 # ──────────────────────────────────────────────────────────────────────────────
 # S3 - Cold path / long-term storage (Parquet)
@@ -104,7 +104,7 @@ resource "aws_kinesis_firehose_delivery_stream" "archive" {
     bucket_arn = aws_s3_bucket.iot_archive.arn
 
     prefix             = "raw/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/"
-    error_output_prefix = "errors/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/"
+    error_output_prefix = "errors/!{firehose:error-output-type}/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/"
 
     buffering_size     = local.firehose_buffer_size
     buffering_interval = local.firehose_buffer_interval
@@ -189,6 +189,27 @@ resource "aws_iam_role_policy" "firehose_policy" {
         Action   = ["s3:PutObject", "s3:PutObjectAcl"]
         Resource = "${aws_s3_bucket.iot_archive.arn}/*"
       },
+      {
+        effect = "Allow"
+        action = [
+         "kms:Decrypt",
+         "kms:GenerateDataKey"
+    ]
+    resource = [aws_kms_key.s3.arn]
+      },
+      {
+      Effect   = "Allow"
+      Action   = [
+        "glue:GetDatabase",
+        "glue:GetDatabases",
+        "glue:GetTable",
+        "glue:GetTables",
+        "glue:GetTableVersion",
+        "glue:GetTableVersions",
+        "glue:GetPartitions"
+      ]
+      Resource = "*"
+      },
       # Kinesis read
       {
         Effect   = "Allow"
@@ -208,3 +229,43 @@ resource "aws_iam_role_policy" "firehose_policy" {
 # Data sources for cleaner references
 data "aws_region" "current" {}
 data "aws_caller_identity" "current" {}
+
+resource "aws_glue_catalog_database" "iot" {
+  name = "iot_default"
+}
+
+resource "aws_glue_catalog_table" "iot_raw_parquet" {
+  name          = "iot_raw_parquet"
+  database_name = aws_glue_catalog_database.iot.name
+
+  table_type = "EXTERNAL_TABLE"
+
+  storage_descriptor {
+    columns {
+      name = "device_id"
+      type = "string"
+    }
+    columns {
+      name = "timestamp"
+      type = "timestamp"
+    }
+    columns {
+      name = "temperature"
+      type = "double"
+    }
+    # Add more columns matching your IoT JSON payload
+  }
+
+  partition_keys {
+    name = "year"
+    type = "string"
+  }
+  partition_keys {
+    name = "month"
+    type = "string"
+  }
+  partition_keys {
+    name = "day"
+    type = "string"
+  }
+}
