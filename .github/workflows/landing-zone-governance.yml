@@ -141,15 +141,21 @@ jobs:
         run: terraform show -json tfplan.binary > tfplan.json
 
 
-      - name: Infracost Breakdown
-        uses: infracost/actions@v2
-        with:
-          path: tfplan.json
+      - name: Install Infracost
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/infracost/infracost/master/scripts/install.sh | sh
+          sudo mv infracost-linux-amd64 /usr/local/bin/infracost
+
+      - name: Run Infracost breakdown
+        run: |
+          infracost breakdown \
+            --path=tfplan.json \
+            --format=json \
+            --out-file=infracost-output.json
         env:
           INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
-          
 
-      - name: Output Infracost results
+      - name: Show cost result
         run: cat infracost-output.json
 
       - name: OPA Policy Check
