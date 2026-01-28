@@ -20,7 +20,6 @@ module "smart_city_traffic" {
 
   # Azure-specific vars if needed
 }
-
 locals {
   # Define a map for your common tags
   prefix = "${var.env}-smart-traffic"
