@@ -2,9 +2,9 @@ locals {
   # Mandatory Enterprise Tags
   common_tags = {
     CostCenter  = "Infrastructure-101"
-    Environment = "Production"
+    Environment = "prod"
     Owner       = "Platform-Team"
-    Project     = "JoinNetwork-LZ"
+    Project     = "Landing"
   }
 
   # Helper for Account tags (merges base tags with the specific account name)
