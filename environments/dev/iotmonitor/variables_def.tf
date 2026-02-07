@@ -10,3 +10,9 @@ variable "project_name" {
   default     = "iotmonitor"
   type        = string
 }
+
+variable "env" {
+  description = "Environment"
+  default     = "dev"
+  type        = string
+}

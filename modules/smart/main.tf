@@ -195,7 +195,6 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "replication_desti
 resource "aws_s3_bucket_versioning" "replication_destination" {
   count = var.cloud_provider == "aws" ? 1 : 0
 
-  provider = aws.secondary
   bucket   = aws_s3_bucket.replication_destination[0].id
   versioning_configuration {
     status = "Enabled"
