@@ -14,7 +14,7 @@ module "smart_city_traffic" {
   vpc_id              = module.dev_network.vpc_id
   private_subnets     = module.dev_network.private_subnets
   public_subnets      = module.dev_network.public_subnets # For API Gateway or public endpoints
-  kinesis_shard_count = 1                              # Scaled for 200K events/sec
+  kinesis_shard_count = 1                                 # Scaled for 200K events/sec
   alert_email         = "traffic-alerts@city.gov"
   sagemaker_model     = "traffic-forecast-lstm" # Example model name
 
@@ -27,7 +27,7 @@ locals {
   common_tags = {
     Project     = "AI Training Data"
     Environment = "dev"
-    CostCenter  = "Sensitive-ML"
+    Data_type   = "Sensitive-ML"
   }
 }
 
@@ -81,4 +81,5 @@ resource "aws_route" "private_to_nat" {
   route_table_id         = module.dev_network.private_route_table_ids[count.index]
   destination_cidr_block = "0.0.0.0/0"
   nat_gateway_id         = aws_nat_gateway.private_outbound[count.index].id
+
 }

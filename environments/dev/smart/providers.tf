@@ -15,7 +15,7 @@ terraform {
 
 locals {
   mandatory_tags = {
-    CostCenter  = "CC-12345"
+    CostCenter  = "Smart-city"
     Environment = var.env
     Owner       = "SmartCity Team"
     Project     = "Traffic Management"

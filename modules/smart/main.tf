@@ -85,6 +85,7 @@ resource "aws_s3_bucket" "traffic_archive" {
   force_destroy = var.env == "dev"
 }
 
+
 resource "aws_s3_bucket_server_side_encryption_configuration" "traffic_archive" {
   count = var.cloud_provider == "aws" ? 1 : 0
 
@@ -143,6 +144,19 @@ resource "aws_s3_bucket" "log_bucket" {
   force_destroy = var.env == "dev"
 }
 
+resource "aws_s3_bucket_server_side_encryption_configuration" "log_bucket" {
+  count = var.cloud_provider == "aws" ? 1 : 0
+
+  bucket = aws_s3_bucket.log_bucket[0].id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.data_key[0].arn
+    }
+    bucket_key_enabled = true
+  }
+}
+
 resource "aws_s3_bucket_logging" "traffic_archive" {
   count = var.cloud_provider == "aws" ? 1 : 0
 
@@ -163,6 +177,19 @@ resource "aws_s3_bucket" "replication_destination" {
 
   provider = aws.secondary
   bucket   = "${local.prefix}-replica"
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "replication_destination" {
+  count = var.cloud_provider == "aws" ? 1 : 0
+
+  bucket = aws_s3_bucket.replication_destination[0].id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.data_key[0].arn
+    }
+    bucket_key_enabled = true
+  }
 }
 
 resource "aws_s3_bucket_versioning" "replication_destination" {

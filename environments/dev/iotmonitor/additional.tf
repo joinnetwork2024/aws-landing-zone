@@ -7,6 +7,18 @@ data "aws_vpc" "selected" {
   id = module.dev_network.vpc_id
 }
 
+locals {
+  # Define a map for your common tags
+  prefix = "${var.env}-smart-traffic"
+
+  common_tags = {
+    Project     = "IOT"
+    Owner     = "APP team"
+    Environment = "dev"
+    CostCenter   = "IOTMONITOR"
+  }
+}
+
 # KMS Key for OpenSearch (dedicated encryption for telemetry)
 resource "aws_kms_key" "opensearch" {
   description             = "KMS key for OpenSearch IoT telemetry encryption"

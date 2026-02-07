@@ -16,7 +16,15 @@ untaggable_resources := {
     "aws_organizations_organization",
     "aws_organizations_policy_attachment",
     "aws_route_table_association",
-    "aws_sns_topic_subscription"
+    "aws_sns_topic_subscription",
+    "aws_route",
+    "aws_apigatewayv2_integration",
+    "aws_s3_bucket_lifecycle_configuration",
+    "aws_s3_bucket_logging",
+    "aws_s3_bucket_notification",
+    "aws_s3_bucket_replication_configuration",
+    "aws_glue_catalog_table",
+    "aws_iam_role_policy_attachment"
 }
 
 deny contains msg if {
