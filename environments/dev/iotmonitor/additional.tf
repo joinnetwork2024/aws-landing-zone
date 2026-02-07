@@ -13,9 +13,9 @@ locals {
 
   common_tags = {
     Project     = "IOT"
-    Owner     = "APP team"
+    Owner       = "APP team"
     Environment = "dev"
-    CostCenter   = "IOTMONITOR"
+    CostCenter  = "IOTMONITOR"
   }
 }
 

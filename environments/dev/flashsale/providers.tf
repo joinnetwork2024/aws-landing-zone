@@ -1,8 +1,8 @@
 locals {
   mandatory_tags = {
     CostCenter  = "Flashsale" # ← change to your real value
-    Environment = "dev"         # ← or use var.env
-    Owner       = "APP Team"    # or your name/email
+    Environment = "dev"       # ← or use var.env
+    Owner       = "APP Team"  # or your name/email
   }
 }
 
