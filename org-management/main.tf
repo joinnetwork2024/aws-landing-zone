@@ -66,7 +66,7 @@ resource "aws_organizations_account" "log_archive" {
 }
 
 resource "aws_organizations_account" "network" {
-  name      = "lz-network"
+  name      = "networkeasy2"
   email     = var.network_account_email
   parent_id = aws_organizations_organizational_unit.network_ou.id
   tags      = local.account_tags_network
@@ -106,3 +106,4 @@ module "scp_guardrails" {
   # You can target the entire Root or specific OUs
   target_id = aws_organizations_organization.main.roots[0].id
 }
+

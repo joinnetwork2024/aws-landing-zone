@@ -49,7 +49,7 @@ resource "aws_kinesis_stream" "traffic_data" {
 
   name             = "${local.prefix}-stream"
   shard_count      = var.kinesis_shard_count
-  retention_period  = 48  # hours
+  retention_period  = 24  # hours
   encryption_type  = "KMS"
   kms_key_id       = aws_kms_key.data_key[0].arn
 }
@@ -70,7 +70,7 @@ resource "aws_timestreamwrite_table" "metrics" {
   database_name = aws_timestreamwrite_database.traffic_db[0].database_name
   table_name    = "traffic_metrics"
   retention_properties {
-    memory_store_retention_period_in_hours  = 48
+    memory_store_retention_period_in_hours  = 24
     magnetic_store_retention_period_in_days = 365
   }
 }

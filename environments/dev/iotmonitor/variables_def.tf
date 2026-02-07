@@ -7,6 +7,6 @@ variable "aws_region" {
 
 variable "project_name" {
   description = "Project name"
-  default     = "landing"
+  default     = "iotmonitor"
   type        = string
 }
