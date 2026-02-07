@@ -165,7 +165,7 @@ jobs:
           opa eval \
             --data "${{ github.workspace }}/policies/" \
             --input tfplan.json \
-            "data.terraform.policy.deny" \
+            "data.terraform.security.deny" \
             --format json \
             > "${{ github.workspace }}/opa_result.json" 2>/dev/null || true
 
