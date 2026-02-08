@@ -2,7 +2,7 @@ variable "rcf_model_artifact_url" {
   description = "S3 model.tar.gz from RCF training job completion"
   type        = string
   sensitive   = true
-  default = "https://dev-smart-traffic-archive-715841360340.s3.eu-west-2.amazonaws.com/rcf-anomaly/training.csv"
+  default     = "https://dev-smart-traffic-archive-715841360340.s3.eu-west-2.amazonaws.com/rcf-anomaly/training.csv"
 }
 
 data "aws_region" "current" {}
@@ -10,8 +10,8 @@ data "aws_caller_identity" "current" {}
 
 locals {
   rcf_images = {
-    "eu-west-1"   = "664544806723.dkr.ecr.eu-west-1.amazonaws.com/randomcutforest:1"   # Fixes your current error
-    "eu-west-2"   = "382416733822.dkr.ecr.eu-west-2.amazonaws.com/randomcutforest:1"
+    "eu-west-1" = "664544806723.dkr.ecr.eu-west-1.amazonaws.com/randomcutforest:1" # Fixes your current error
+    "eu-west-2" = "382416733822.dkr.ecr.eu-west-2.amazonaws.com/randomcutforest:1"
     # Add others as needed - full list: AWS SageMaker algo registry paths
   }
   rcf_image = local.rcf_images[data.aws_region.current.name]
@@ -35,9 +35,9 @@ resource "aws_iam_role" "smart_city_sagemaker_execution" {
   })
 
   tags = {
-    Project     = "SmartCity"
-    Component   = "MLExecutionRole"
-    GovernedBy  = "Terraform"
+    Project    = "SmartCity"
+    Component  = "MLExecutionRole"
+    GovernedBy = "Terraform"
   }
 }
 
@@ -55,12 +55,12 @@ resource "aws_iam_role_policy" "s3_traffic_limited" {
     Version = "2012-10-17"
     Statement = [
       {
-        Action   = ["s3:GetObject", "s3:PutObject", "s3:ListBucket"]
+        Action = ["s3:GetObject", "s3:PutObject", "s3:ListBucket"]
         Resource = [
           local.traffic_archive_bucket_arn,
           "${local.traffic_archive_bucket_arn}/*"
         ]
-        Effect   = "Allow"
+        Effect = "Allow"
       },
       {
         Action   = ["s3:ListAllMyBuckets", "s3:GetBucketLocation"]
@@ -79,7 +79,7 @@ resource "aws_iam_role_policy_attachment" "cloudwatch_logs" {
 # Persistent Model (uses dedicated role)
 resource "aws_sagemaker_model" "traffic_rcf_anomaly" {
   name               = "smart-city-traffic-rcf-anomaly-model"
-  execution_role_arn = aws_iam_role.smart_city_sagemaker_execution.arn  # Fixed: uses defined role
+  execution_role_arn = aws_iam_role.smart_city_sagemaker_execution.arn # Fixed: uses defined role
 
   primary_container {
     image          = local.rcf_image
@@ -95,7 +95,7 @@ resource "aws_sagemaker_endpoint_configuration" "traffic_rcf_anomaly" {
     variant_name           = "rcf-anomaly"
     model_name             = aws_sagemaker_model.traffic_rcf_anomaly.name
     initial_instance_count = 1
-    instance_type          = "ml.m5.large"  # (~£0.10/hour); delete after demo
+    instance_type          = "ml.m5.large" # (~£0.10/hour); delete after demo
   }
 }
 
