@@ -1,19 +1,14 @@
 pipeline {
-    agent {
-        docker {
-            image 'hashicorp/terraform:1.14.6'  // pin to avoid surprises
-            // args '-u root:root'  // uncomment if you get permission errors on workspace files
-        }
+  agent any
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
     }
 
-    stages {
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
-
-        stage('Terraform Init') {
+    stage('Terraform Init') {
             steps {
                 dir('environments/dev/flashsale') {
                     sh 'terraform init'
@@ -21,7 +16,7 @@ pipeline {
             }
         }
 
-        stage('Terraform Validate') {
+    stage('Terraform Validate') {
             steps {
                 dir('environments/dev/flashsale') {
                     sh 'terraform validate'
@@ -29,18 +24,11 @@ pipeline {
             }
         }
 
-        stage('Terraform Plan') {
+    stage('Terraform Plan') {
             steps {
                 dir('environments/dev/flashsale') {
                     sh 'terraform plan -out=tfplan'
                 }
-            }
-        }
     }
-
-    post {
-        always {
-            cleanWs()  // optional: cleanup
-        }
-    }
+  }
 }
