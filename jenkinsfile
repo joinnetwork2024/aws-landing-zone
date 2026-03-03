@@ -8,22 +8,30 @@ pipeline {
       }
     }
 
-    stage('Terraform Init') {
-      steps {
-        sh 'terraform init'
-      }
-    }
+stage('Terraform Init') {
+            steps {
+                dir('environments/dev/flashsale') {
+                    sh 'terraform init'
+                }
+            }
+        }
 
-    stage('Terraform Validate') {
-      steps {
-        sh 'terraform validate'
-      }
-    }
+        stage('Terraform Validate') {
+            steps {
+                dir('environments/dev/flashsale') {
+                    sh 'terraform validate'
+                }
+            }
+        }
 
-    stage('Terraform Plan') {
-      steps {
-        sh 'terraform plan'
-      }
+        stage('Terraform Plan') {
+            steps {
+                dir('environments/dev/flashsale') {
+                    sh 'terraform plan -out=tfplan'
+                }
+            }
+        }
+
+        // stage('Terraform Apply') { ... }   ← usually manual approval gate
     }
-  }
 }
