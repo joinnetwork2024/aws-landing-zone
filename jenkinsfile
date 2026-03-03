@@ -1,6 +1,10 @@
 pipeline {
-    agent any
-
+    agent {
+        docker {
+            image 'hashicorp/terraform:1.14.6'  // Latest stable as of March 2026 (from releases.hashicorp.com)
+            // args '-u root:root'  // Add if you get chown/chmod errors on workspace files
+        }
+    }
     stages {
         stage('Checkout') {
             steps {
