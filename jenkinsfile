@@ -8,19 +8,7 @@ pipeline {
             }
         }
 
-        stage('Install Terraform') {
-            steps {
-                sh '''
-                    # Download and install latest stable Terraform (as of March 2026: 1.14.6)
-                    TERRAFORM_VERSION=1.14.6
-                    wget -q https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
-                    unzip -o terraform_${TERRAFORM_VERSION}_linux_amd64.zip
-                    chmod +x terraform
-                    # Move to a path that's in $PATH (or use ./terraform later)
-                    mv terraform /usr/local/bin/ || echo "Could not move to /usr/local/bin (permissions?), using local"
-                '''
-            }
-        }
+
 
         stage('Terraform Init') {
             steps {
