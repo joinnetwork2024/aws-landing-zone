@@ -1,22 +1,38 @@
 pipeline {
-  agent any
+    agent any
 
-  stages {
-    stage('Checkout') {
-      steps {
-        checkout scm
-      }
-    }
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
 
-    stage('Terraform Init') {
+        stage('Install Terraform') {
+            steps {
+                sh '''
+                    # Download and install latest stable Terraform (as of March 2026: 1.14.6)
+                    TERRAFORM_VERSION=1.14.6
+                    wget -q https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+                    unzip -o terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+                    chmod +x terraform
+                    # Move to a path that's in $PATH (or use ./terraform later)
+                    mv terraform /usr/local/bin/ || echo "Could not move to /usr/local/bin (permissions?), using local"
+                '''
+            }
+        }
+
+        stage('Terraform Init') {
             steps {
                 dir('environments/dev/flashsale') {
                     sh 'terraform init'
+                    // Add -upgrade if you want to force latest providers/modules
+                    // sh 'terraform init -upgrade'
                 }
             }
         }
 
-    stage('Terraform Validate') {
+        stage('Terraform Validate') {
             steps {
                 dir('environments/dev/flashsale') {
                     sh 'terraform validate'
@@ -24,11 +40,36 @@ pipeline {
             }
         }
 
-    stage('Terraform Plan') {
+        stage('Terraform Plan') {
             steps {
                 dir('environments/dev/flashsale') {
                     sh 'terraform plan -out=tfplan'
                 }
+            }
+        }
+
+        // Uncomment for manual approval + apply later
+        /*
+        stage('Approval') {
+            steps {
+                input message: 'Apply Terraform changes to dev/flashsale?', ok: 'Apply'
+            }
+        }
+
+        stage('Terraform Apply') {
+            steps {
+                dir('environments/dev/flashsale') {
+                    sh 'terraform apply -auto-approve tfplan'
+                }
+            }
+        }
+        */
     }
-  }
+
+    post {
+        always {
+            // Optional: clean workspace to save space
+            cleanWs()
+        }
+    }
 }
