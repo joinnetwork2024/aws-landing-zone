@@ -1,16 +1,77 @@
-stage('Debug PATH and Terraform') {
-    steps {
-        sh '''
-            echo "Current working directory:"
-            pwd
-            echo ""
-            echo "PATH is:"
-            echo $PATH
-            echo ""
-            which terraform || echo "terraform NOT found in PATH"
-            terraform --version || echo "terraform command failed"
-            ls -la /usr/local/bin/terraform || echo "Not in /usr/local/bin"
-            ls -la ~/bin/terraform || echo "Not in ~/bin"
-        '''
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Debug PATH and Terraform') {
+            steps {
+                sh '''
+                    echo "Current working directory:"
+                    pwd
+                    echo ""
+                    echo "PATH is:"
+                    echo $PATH
+                    echo ""
+                    which terraform || echo "terraform NOT found in PATH"
+                    terraform --version || echo "terraform command failed (exit code $?)"
+                    ls -la /usr/local/bin/terraform || echo "Not found in /usr/local/bin"
+                    ls -la /usr/bin/terraform || echo "Not found in /usr/bin"
+                    ls -la ~/terraform || echo "Not in home dir"
+                '''
+            }
+        }
+
+        stage('Terraform Init') {
+            steps {
+                dir('environments/dev/flashsale') {
+                    sh 'terraform init'
+                }
+            }
+        }
+
+        stage('Terraform Validate') {
+            steps {
+                dir('environments/dev/flashsale') {
+                    sh 'terraform validate'
+                }
+            }
+        }
+
+        stage('Terraform Plan') {
+            steps {
+                dir('environments/dev/flashsale') {
+                    sh 'terraform plan -out=tfplan'
+                }
+            }
+        }
+
+        // Uncomment for manual approval + apply later
+        /*
+        stage('Approval') {
+            steps {
+                input message: 'Apply Terraform changes to dev/flashsale?', ok: 'Apply'
+            }
+        }
+
+        stage('Terraform Apply') {
+            steps {
+                dir('environments/dev/flashsale') {
+                    sh 'terraform apply -auto-approve tfplan'
+                }
+            }
+        }
+        */
+    }
+
+    post {
+        always {
+            // Optional: clean workspace to save space
+            cleanWs()
+        }
     }
 }
