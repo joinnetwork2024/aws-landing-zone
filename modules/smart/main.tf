@@ -174,7 +174,6 @@ data "aws_region" "secondary" {
 
 resource "aws_s3_bucket" "replication_destination" {
   count = var.cloud_provider == "aws" ? 1 : 0
-
   
   bucket   = "${local.prefix}-replica"
 }
