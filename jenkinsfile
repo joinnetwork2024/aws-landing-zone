@@ -1,13 +1,5 @@
 pipeline {
     // This runs the entire pipeline inside a Docker container with Terraform pre-installed
-    agent {
-        docker {
-            image 'hashicorp/terraform:1.14.6'  // or 'latest' if you want auto-updates
-            // Optional: run as root if you hit permission issues with workspace files
-            // args '-u root:root'
-        }
-    }
-
     stages {
         stage('Checkout') {
             steps {
