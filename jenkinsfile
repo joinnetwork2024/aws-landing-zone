@@ -1,10 +1,8 @@
 pipeline {
-    // This runs the entire pipeline inside a Docker container with Terraform pre-installed
     agent {
         docker {
-            image 'hashicorp/terraform:1.14.6'  // or 'latest' if you want auto-updates
-            // Optional: run as root if you hit permission issues with workspace files
-            // args '-u root:root'
+            image 'hashicorp/terraform:1.14.6'  // pin to avoid surprises
+            // args '-u root:root'  // uncomment if you get permission errors on workspace files
         }
     }
 
@@ -19,8 +17,6 @@ pipeline {
             steps {
                 dir('environments/dev/flashsale') {
                     sh 'terraform init'
-                    // Optional: add -upgrade if you want to force provider/module updates
-                    // sh 'terraform init -upgrade'
                 }
             }
         }
@@ -37,34 +33,14 @@ pipeline {
             steps {
                 dir('environments/dev/flashsale') {
                     sh 'terraform plan -out=tfplan'
-                    // Optional: save the plan artifact for review/apply later
-                    // archiveArtifacts artifacts: 'environments/dev/flashsale/tfplan', fingerprint: true
                 }
             }
         }
-
-        // Example: Add Apply stage later with manual approval
-        /*
-        stage('Approval') {
-            steps {
-                input message: 'Apply Terraform changes?', ok: 'Apply'
-            }
-        }
-
-        stage('Terraform Apply') {
-            steps {
-                dir('environments/dev/flashsale') {
-                    sh 'terraform apply -auto-approve tfplan'
-                }
-            }
-        }
-        */
     }
 
-    // Optional: Clean up workspace after run
     post {
         always {
-            cleanWs()
+            cleanWs()  // optional: cleanup
         }
     }
 }
