@@ -62,11 +62,9 @@ Central Shared Network account with Transit Gateway; spoke VPCs in workload acco
 - **Performance Efficiency (PERF 4)** – Low-latency paths for ML data pipelines.  
 - **Cost Optimization (COST 4)** – Eliminates peering sprawl.
 
-**Influence from On-Premises Expertise**  
-My 10+ years configuring Cisco ASR/ISR routers, Palo Alto firewalls, and BGP in enterprise WANs directly informed TGW route propagation, AS-PATH prepending, and policy-based routing design.
 
 **Quantified Benefit**  
-For a 6-account landing zone, hub-and-spoke requires only 6 attachments vs 15 for full mesh → **60% reduction in connections and management effort**.
+For a 6-account landing zone, hub-and-spoke 
 
 ### 3. Layered Network Controls: Security Groups + NACLs
 
