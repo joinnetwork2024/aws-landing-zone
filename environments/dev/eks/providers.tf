@@ -1,14 +1,14 @@
 locals {
   mandatory_tags = {
-    CostCenter  = "eks" # ← change to your real value
+    CostCenter  = "eks" 
     Environment = "dev"       # ← or use var.env
-    Owner       = "eks Team"  # or your name/email
+    Owner       = "eks Team"  
   }
 }
 
 provider "aws" {
 
-  region = "eu-west-2" # your region
+  region = "eu-west-2" 
  
   default_tags {
     tags = local.mandatory_tags
